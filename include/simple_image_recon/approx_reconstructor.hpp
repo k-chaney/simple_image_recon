@@ -144,8 +144,13 @@ private:
     if(useSliceInterval_){
       nextFrameTime_ += sliceInterval_;
     } else {
-      nextFrameTime_ = sliceTimes_.front();
-      sliceTimes_.pop();
+      if (sliceTimes_.empty()){
+        std::cout << "Defaulting to FPS!! " << std::endl;
+        nextFrameTime_ += sliceInterval_;
+      } else {
+        nextFrameTime_ = sliceTimes_.front();
+        sliceTimes_.pop();
+      }
     }
   }
 
