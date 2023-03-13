@@ -30,11 +30,16 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   image_transport)
 
-catkin_package()
+catkin_package(
+  INCLUDE_DIRS include ${simple_image_recon_lib_INCLUDE_DIRS}
+  CATKIN_DEPENDS roscpp nodelet rosbag event_array_msgs event_array_codecs sensor_msgs image_transport
+  )
 
 include_directories(
   include
-  ${catkin_INCLUDE_DIRS})
+  ${catkin_INCLUDE_DIRS}
+  ${simple_image_recon_lib_INCLUDE_DIRS}
+  )
 #
 # --------- library
 #

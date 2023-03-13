@@ -26,6 +26,8 @@
 #include "simple_image_recon/check_endian.hpp"
 #include "simple_image_recon/frame_handler.hpp"
 
+#define SEC_TO_NSEC(X) (X*1000000000)
+
 namespace simple_image_recon
 {
 template <
@@ -38,7 +40,7 @@ public:
   explicit ApproxReconstructor(
     FrameHandler<ImageConstPtrT> * fh, const std::string & topic,
     int cutoffNumEvents = 30, double fps = 25.0, double fillRatio = 0.6,
-    int tileSize = 2, uint64_t offset = 0)
+    int tileSize = 2, uint64_t offset = 0, std::vector<double> frameTimes = {})
   : frameHandler_(fh),
     topic_(topic),
     cutoffNumEvents_(cutoffNumEvents),
@@ -46,7 +48,12 @@ public:
     tileSize_(tileSize),
     timeOffset_(offset)
   {
-    sliceInterval_ = static_cast<uint64_t>(1000000000 / std::abs(fps));
+    if ( static_cast<int>(fps) < 0 ){
+      useSliceInterval_ = false;
+      addFrameTimes(frameTimes);
+    }
+
+    sliceInterval_ = static_cast<uint64_t>(SEC_TO_NSEC(1) / std::abs(fps));
     imageMsgTemplate_.height = 0;
   }
 
@@ -57,7 +64,7 @@ public:
     simpleReconstructor_.event(t, ex, ey, polarity);
     while (t + timeOffset_ > nextFrameTime_) {
       emitFrame();
-      nextFrameTime_ += sliceInterval_;
+      setNextTime();
     }
   }
   void eventExtTrigger(uint64_t, uint8_t, uint8_t) override {}
@@ -84,7 +91,7 @@ public:
       firstDecoder->decode(
         &(msg->events[0]), msg->events.size(), &firstMsgProcessor);
       t0_ = firstMsgProcessor.getFirstTimeStamp() + timeOffset_;
-      nextFrameTime_ = (t0_ / sliceInterval_) * sliceInterval_;
+      setFirstTime();
       simpleReconstructor_.initialize(
         msg->width, msg->height,
         static_cast<uint32_t>(std::abs(cutoffNumEvents_)), tileSize_,
@@ -121,6 +128,43 @@ private:
     uint64_t firstTimeStamp_{0};
   };
 
+  void setFirstTime()
+  {
+    if(useSliceInterval_){
+      nextFrameTime_ = (t0_ / sliceInterval_) * sliceInterval_;
+    } else {
+      while(nextFrameTime_ < t0_){
+        setNextTime();
+      }
+    }
+  }
+
+  void setNextTime()
+  {
+    if(useSliceInterval_){
+      nextFrameTime_ += sliceInterval_;
+    } else {
+      nextFrameTime_ = sliceTimes_.front();
+      sliceTimes_.pop();
+    }
+  }
+
+  void addFrameTime(double t)
+  {
+    sliceTimes_.push(static_cast<uint64_t>(SEC_TO_NSEC(t)));
+  }
+
+  void addFrameTimes(std::vector<double>& ts)
+  {
+    for(double& t : ts)
+      addFrameTime(t);
+  }
+
+  bool hasFrameTimes()
+  {
+    return !sliceTimes_.empty();
+  }
+
   void emitFrame()
   {
     auto msg = std::make_unique<ImageT>(imageMsgTemplate_);
@@ -142,6 +186,8 @@ private:
   ImageT imageMsgTemplate_;
   int cutoffNumEvents_{0};
   uint64_t sliceInterval_{0};
+  std::queue<uint64_t> sliceTimes_;
+  bool useSliceInterval_{true};
   uint64_t nextFrameTime_{0};
   uint64_t t0_{0};
   double fillRatio_{0};
