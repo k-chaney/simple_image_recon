@@ -40,19 +40,19 @@ public:
   explicit ApproxReconstructor(
     FrameHandler<ImageConstPtrT> * fh, const std::string & topic,
     int cutoffNumEvents = 30, double fps = 25.0, double fillRatio = 0.6,
-    int tileSize = 2, uint64_t offset = 0, std::vector<double> frameTimes = {})
+    int tileSize = 2, double offset = 0, std::vector<double> frameTimes = {})
   : frameHandler_(fh),
     topic_(topic),
     cutoffNumEvents_(cutoffNumEvents),
     fillRatio_(fillRatio),
-    tileSize_(tileSize),
-    timeOffset_(offset)
+    tileSize_(tileSize)
   {
-    if ( static_cast<int>(fps) < 0 ){
+    if ( frameTimes.size() > 0 ){
       useSliceInterval_ = false;
       addFrameTimes(frameTimes);
     }
 
+    timeOffset_ = static_cast<uint64_t>(SEC_TO_NSEC(offset));
     sliceInterval_ = static_cast<uint64_t>(SEC_TO_NSEC(1) / std::abs(fps));
     imageMsgTemplate_.height = 0;
   }
