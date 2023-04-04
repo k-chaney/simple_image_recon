@@ -40,7 +40,7 @@ public:
   explicit ApproxReconstructor(
     FrameHandler<ImageConstPtrT> * fh, const std::string & topic,
     int cutoffNumEvents = 30, double fps = 25.0, double fillRatio = 0.6,
-    int tileSize = 2, double offset = 0, std::vector<double> frameTimes = {})
+    int tileSize = 2, uint64_t offset = 0, std::vector<uint64_t> frameTimes = {})
   : frameHandler_(fh),
     topic_(topic),
     cutoffNumEvents_(cutoffNumEvents),
@@ -52,7 +52,7 @@ public:
       addFrameTimes(frameTimes);
     }
 
-    timeOffset_ = static_cast<uint64_t>(SEC_TO_NSEC(offset));
+    timeOffset_ = static_cast<uint64_t>(offset);
     sliceInterval_ = static_cast<uint64_t>(SEC_TO_NSEC(1) / std::abs(fps));
     imageMsgTemplate_.height = 0;
   }
@@ -90,7 +90,9 @@ public:
         firstFactory.getInstance(msg->encoding, msg->width, msg->height);
       firstDecoder->decode(
         &(msg->events[0]), msg->events.size(), &firstMsgProcessor);
+      std::cout << "First timestamp " << firstMsgProcessor.getFirstTimeStamp() << std::endl;
       t0_ = firstMsgProcessor.getFirstTimeStamp() + timeOffset_;
+      std::cout << "First time " << t0_ << std::endl;
       setFirstTime();
       simpleReconstructor_.initialize(
         msg->width, msg->height,
@@ -154,14 +156,14 @@ private:
     }
   }
 
-  void addFrameTime(double t)
+  void addFrameTime(uint64_t t)
   {
-    sliceTimes_.push(static_cast<uint64_t>(SEC_TO_NSEC(t)));
+    sliceTimes_.push(t);
   }
 
-  void addFrameTimes(std::vector<double>& ts)
+  void addFrameTimes(std::vector<uint64_t>& ts)
   {
-    for(double& t : ts)
+    for(uint64_t& t : ts)
       addFrameTime(t);
   }
 
