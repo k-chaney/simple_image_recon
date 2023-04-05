@@ -40,7 +40,7 @@ public:
   explicit ApproxReconstructor(
     FrameHandler<ImageConstPtrT> * fh, const std::string & topic,
     int cutoffNumEvents = 30, double fps = 25.0, double fillRatio = 0.6,
-    int tileSize = 2, uint64_t offset = 0, std::vector<uint64_t> frameTimes = {})
+    int tileSize = 2, int64_t offset = 0, std::vector<int64_t> frameTimes = {})
   : frameHandler_(fh),
     topic_(topic),
     cutoffNumEvents_(cutoffNumEvents),
@@ -52,8 +52,8 @@ public:
       addFrameTimes(frameTimes);
     }
 
-    timeOffset_ = static_cast<uint64_t>(offset);
-    sliceInterval_ = static_cast<uint64_t>(SEC_TO_NSEC(1) / std::abs(fps));
+    timeOffset_ = static_cast<int64_t>(offset);
+    sliceInterval_ = static_cast<int64_t>(SEC_TO_NSEC(1) / std::abs(fps));
     imageMsgTemplate_.height = 0;
   }
 
@@ -62,7 +62,7 @@ public:
     uint64_t t, uint16_t ex, uint16_t ey, uint8_t polarity) override
   {
     simpleReconstructor_.event(t, ex, ey, polarity);
-    while (t + timeOffset_ > nextFrameTime_) {
+    while ( (int64_t)t + timeOffset_ > nextFrameTime_) {
       emitFrame();
       setNextTime();
     }
@@ -72,7 +72,7 @@ public:
   void rawData(const char *, size_t) override{};
   // --------- end of inherited from EventProcessor
 
-  uint64_t getT0() const { return (t0_); }
+  int64_t getT0() const { return (t0_); }
 
   void processMsg(EventArrayConstSharedPtrT msg)
   {
@@ -91,7 +91,7 @@ public:
       firstDecoder->decode(
         &(msg->events[0]), msg->events.size(), &firstMsgProcessor);
       std::cout << "First timestamp " << firstMsgProcessor.getFirstTimeStamp() << std::endl;
-      t0_ = firstMsgProcessor.getFirstTimeStamp() + timeOffset_;
+      t0_ = (int64_t)firstMsgProcessor.getFirstTimeStamp() + timeOffset_;
       std::cout << "First time " << t0_ << std::endl;
       setFirstTime();
       simpleReconstructor_.initialize(
@@ -124,10 +124,10 @@ private:
     void finished() override{};
     void rawData(const char *, size_t) override{};
     // --------- end of inherited from EventProcessor
-    uint64_t getFirstTimeStamp() const { return (firstTimeStamp_); }
+    int64_t getFirstTimeStamp() const { return (firstTimeStamp_); }
     // --------- variables -----------
   private:
-    uint64_t firstTimeStamp_{0};
+    int64_t firstTimeStamp_{0};
   };
 
   void setFirstTime()
@@ -135,6 +135,7 @@ private:
     if(useSliceInterval_){
       nextFrameTime_ = (t0_ / sliceInterval_) * sliceInterval_;
     } else {
+      setNextTime();
       while(nextFrameTime_ < t0_){
         setNextTime();
       }
@@ -147,7 +148,6 @@ private:
       nextFrameTime_ += sliceInterval_;
     } else {
       if (sliceTimes_.empty()){
-        std::cout << "Defaulting to FPS!! " << std::endl;
         nextFrameTime_ += sliceInterval_;
       } else {
         nextFrameTime_ = sliceTimes_.front();
@@ -156,14 +156,14 @@ private:
     }
   }
 
-  void addFrameTime(uint64_t t)
+  void addFrameTime(int64_t t)
   {
     sliceTimes_.push(t);
   }
 
-  void addFrameTimes(std::vector<uint64_t>& ts)
+  void addFrameTimes(std::vector<int64_t>& ts)
   {
-    for(uint64_t& t : ts)
+    for(int64_t& t : ts)
       addFrameTime(t);
   }
 
@@ -192,14 +192,14 @@ private:
   std::string topic_;
   ImageT imageMsgTemplate_;
   int cutoffNumEvents_{0};
-  uint64_t sliceInterval_{0};
-  std::queue<uint64_t> sliceTimes_;
+  int64_t sliceInterval_{0};
+  std::queue<int64_t> sliceTimes_;
   bool useSliceInterval_{true};
-  uint64_t nextFrameTime_{0};
-  uint64_t t0_{0};
+  int64_t nextFrameTime_{0};
+  int64_t t0_{0};
   double fillRatio_{0};
   int tileSize_{0};
-  uint64_t timeOffset_{0};
+  int64_t timeOffset_{0};
   event_array_codecs::Decoder<ApproxReconstructor> * decoder_{0};
   event_array_codecs::DecoderFactory<ApproxReconstructor> decoderFactory_;
   simple_image_recon_lib::SimpleImageReconstructor simpleReconstructor_;
